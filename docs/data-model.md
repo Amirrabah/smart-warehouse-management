@@ -13,7 +13,7 @@ erDiagram
         int id PK
         string name
         string email UK
-        string hashed_password
+        string password_hash
         string role
         bool is_active
         datetime created_at
