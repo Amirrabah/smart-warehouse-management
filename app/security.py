@@ -29,3 +29,6 @@ def create_access_token(user_id: int) -> str:
 
 def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+
+
+DUMMY_HASH = hash_password("timing-protection-dummy")
