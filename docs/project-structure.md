@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phase 0 merged · Phase 1 in progress (steps 1–7 done, step 8 next)
+**Status:** Phase 0 merged · Phase 1 complete (auth, roles, 40 tests)
 
 ## Folder overview
 
@@ -115,10 +115,13 @@ The container runs `alembic upgrade head` automatically on start.
 
 | File | Proves |
 |---|---|
+| `conftest.py` | Not tests — shared fixtures: `test_engine` (creates `warehouse_test`), `db` (empties tables after each test), `client` (app uses the test DB), `make_user`, `auth_header` |
 | `test_health.py` | `/health` returns 200 `{"status": "ok"}` |
 | `test_security.py` | hash ≠ password, verify works, salting, token round trip, tampered token rejected |
+| `test_auth.py` | login (valid, case-insensitive email, wrong password, unknown email, inactive), `/auth/me`, deactivated user blocked, seed is idempotent |
+| `test_users.py` | worker and planner get 403 on all `/users` endpoints, no token gets 401, admin can list / create / update, duplicates 409, bad input 422, admin cannot demote or deactivate self |
 
-Run with `py -m pytest -v`.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 40 tests.
 
 ## `docs/` — design documents
 
