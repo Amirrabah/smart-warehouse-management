@@ -95,3 +95,13 @@ def test_me_with_token_of_deactivated_user_returns_401(client, make_user, auth_h
 def test_seed_create_admin_is_idempotent(db):
     assert create_admin(db, "Admin", "Admin@Test.Local", "password123") is True
     assert create_admin(db, "Admin", "admin@test.local", "password123") is False
+
+
+def test_login_is_rate_limited_after_five_attempts(client):
+    attempts = [
+        client.post("/auth/login", json={"email": "x@test.local", "password": "wrong"})
+        for _ in range(6)
+    ]
+
+    assert [r.status_code for r in attempts[:5]] == [401] * 5
+    assert attempts[5].status_code == 429
