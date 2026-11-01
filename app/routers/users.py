@@ -38,7 +38,7 @@ def create_user(data: UserCreate, _: AdminUser, db: DbSession):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
-        )
+        ) from None
     db.refresh(user)
     return user
 
@@ -52,7 +52,10 @@ def update_user(user_id: int, data: UserUpdate, admin: AdminUser, db: DbSession)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
     if user.id == admin.id:
-        if changes.get("is_active") is False or changes.get("role", UserRole.ADMIN) != UserRole.ADMIN:
+        if (
+            changes.get("is_active") is False
+            or changes.get("role", UserRole.ADMIN) != UserRole.ADMIN
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="You cannot deactivate or demote yourself",

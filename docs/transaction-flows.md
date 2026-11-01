@@ -208,11 +208,11 @@ Why a reset step: without it, a product that was low once, got restocked, and th
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+
 def _decrease_stock(db, product_id: int, location_id: int, qty: int) -> int:
     row = db.execute(
         select(Inventory)
-        .where(Inventory.product_id == product_id,
-               Inventory.location_id == location_id)
+        .where(Inventory.product_id == product_id, Inventory.location_id == location_id)
         .with_for_update()
     ).scalar_one_or_none()
     if row is None:
@@ -221,6 +221,7 @@ def _decrease_stock(db, product_id: int, location_id: int, qty: int) -> int:
         raise StockConflict(f"Insufficient stock: {row.quantity} available, {qty} requested")
     row.quantity -= qty
     return row.quantity
+
 
 def _increase_stock(db, product_id: int, location_id: int, qty: int) -> int:
     stmt = (

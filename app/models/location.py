@@ -7,9 +7,7 @@ from app.database import Base
 class Location(Base):
     __tablename__ = "locations"
     __table_args__ = (
-        CheckConstraint(
-            "code ~ '^[A-Z]-[0-9]{2}-[0-9]{2}$'", name="ck_locations_code_format"
-        ),
+        CheckConstraint("code ~ '^[A-Z]-[0-9]{2}-[0-9]{2}$'", name="ck_locations_code_format"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

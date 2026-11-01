@@ -37,9 +37,7 @@ def test_non_admin_cannot_create_users(client, make_user, auth_header, role):
 def test_non_admin_cannot_update_users(client, make_user, auth_header, role):
     user = make_user(role=role)
 
-    response = client.patch(
-        f"/users/{user.id}", json={"role": "admin"}, headers=auth_header(user)
-    )
+    response = client.patch(f"/users/{user.id}", json={"role": "admin"}, headers=auth_header(user))
 
     assert response.status_code == 403
 
@@ -102,14 +100,10 @@ def test_create_user_with_duplicate_email_returns_409(client, make_user, auth_he
         {"name": ""},
     ],
 )
-def test_create_user_with_invalid_data_returns_422(
-    client, make_user, auth_header, bad_field
-):
+def test_create_user_with_invalid_data_returns_422(client, make_user, auth_header, bad_field):
     admin = make_user(role=UserRole.ADMIN)
 
-    response = client.post(
-        "/users", json={**NEW_USER, **bad_field}, headers=auth_header(admin)
-    )
+    response = client.post("/users", json={**NEW_USER, **bad_field}, headers=auth_header(admin))
 
     assert response.status_code == 422
 
@@ -117,9 +111,7 @@ def test_create_user_with_invalid_data_returns_422(
 # --- Admin: update ------------------------------------------------------------
 
 
-def test_admin_can_change_role_and_deactivate_other_user(
-    client, make_user, auth_header
-):
+def test_admin_can_change_role_and_deactivate_other_user(client, make_user, auth_header):
     admin = make_user(role=UserRole.ADMIN)
     worker = make_user(role=UserRole.WORKER)
 
@@ -166,14 +158,10 @@ def test_admin_can_reset_password(client, make_user, auth_header):
 
 
 @pytest.mark.parametrize("change", [{"role": "worker"}, {"is_active": False}])
-def test_admin_cannot_demote_or_deactivate_self(
-    client, make_user, auth_header, change
-):
+def test_admin_cannot_demote_or_deactivate_self(client, make_user, auth_header, change):
     admin = make_user(role=UserRole.ADMIN)
 
-    response = client.patch(
-        f"/users/{admin.id}", json=change, headers=auth_header(admin)
-    )
+    response = client.patch(f"/users/{admin.id}", json=change, headers=auth_header(admin))
 
     assert response.status_code == 409
 
@@ -192,9 +180,7 @@ def test_patch_email_is_not_allowed(client, make_user, auth_header):
 def test_patch_unknown_user_returns_404(client, make_user, auth_header):
     admin = make_user(role=UserRole.ADMIN)
 
-    response = client.patch(
-        "/users/9999", json={"name": "Ghost"}, headers=auth_header(admin)
-    )
+    response = client.patch("/users/9999", json={"name": "Ghost"}, headers=auth_header(admin))
 
     assert response.status_code == 404
 
@@ -204,9 +190,7 @@ def test_deactivated_user_is_blocked_immediately(client, make_user, auth_header)
     worker = make_user(role=UserRole.WORKER)
     worker_headers = auth_header(worker)
 
-    client.patch(
-        f"/users/{worker.id}", json={"is_active": False}, headers=auth_header(admin)
-    )
+    client.patch(f"/users/{worker.id}", json={"is_active": False}, headers=auth_header(admin))
     response = client.get("/auth/me", headers=worker_headers)
 
     assert response.status_code == 401

@@ -15,9 +15,7 @@ TEST_DB_URL = _dev_url.set(database=f"{_dev_url.database}_test")
 
 
 def _ensure_test_database_exists() -> None:
-    admin_engine = create_engine(
-        TEST_DB_URL.set(database="postgres"), isolation_level="AUTOCOMMIT"
-    )
+    admin_engine = create_engine(TEST_DB_URL.set(database="postgres"), isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:
         exists = conn.scalar(
             text("SELECT 1 FROM pg_database WHERE datname = :name"),

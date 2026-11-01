@@ -20,9 +20,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 DbSession = Annotated[Session, Depends(get_db)]
 AnyUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
-AdminOrPlanner = Annotated[
-    User, Depends(require_roles(UserRole.ADMIN, UserRole.PLANNER))
-]
+AdminOrPlanner = Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.PLANNER))]
 
 
 def get_product_or_404(db: Session, product_id: int) -> Product:
@@ -58,7 +56,7 @@ def create_product(data: ProductCreate, _: AdminUser, db: DbSession):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="SKU already exists"
-        )
+        ) from None
     db.refresh(product)
     return product
 

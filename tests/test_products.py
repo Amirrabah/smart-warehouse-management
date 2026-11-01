@@ -117,9 +117,7 @@ def test_create_product_with_invalid_data_returns_422(client, admin_headers, bad
 
 @pytest.mark.parametrize("locked_field", [{"sku": "NEW-SKU"}, {"unit": "box"}])
 def test_sku_and_unit_cannot_be_changed(client, admin_headers, product, locked_field):
-    response = client.patch(
-        f"/products/{product['id']}", json=locked_field, headers=admin_headers
-    )
+    response = client.patch(f"/products/{product['id']}", json=locked_field, headers=admin_headers)
 
     assert response.status_code == 422
 
@@ -163,8 +161,7 @@ def test_reorder_point_endpoint_only_accepts_reorder_point(client, make_user, au
 def test_unknown_product_returns_404(client, admin_headers):
     assert client.get("/products/9999", headers=admin_headers).status_code == 404
     assert (
-        client.patch("/products/9999", json={"name": "X"}, headers=admin_headers).status_code
-        == 404
+        client.patch("/products/9999", json={"name": "X"}, headers=admin_headers).status_code == 404
     )
 
 
