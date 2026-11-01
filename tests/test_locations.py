@@ -11,7 +11,9 @@ def admin_headers(make_user, auth_header):
 @pytest.fixture
 def location(client, admin_headers):
     response = client.post(
-        "/locations", json={"code": "A-01-03", "description": "Aisle A, rack 1"}, headers=admin_headers
+        "/locations",
+        json={"code": "A-01-03", "description": "Aisle A, rack 1"},
+        headers=admin_headers,
     )
     assert response.status_code == 201
     return response.json()

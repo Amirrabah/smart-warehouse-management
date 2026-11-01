@@ -8,6 +8,7 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.models import User, UserRole
+from app.rate_limit import limiter
 from app.security import create_access_token, hash_password
 
 _dev_url = make_url(settings.database_url)
@@ -15,9 +16,7 @@ TEST_DB_URL = _dev_url.set(database=f"{_dev_url.database}_test")
 
 
 def _ensure_test_database_exists() -> None:
-    admin_engine = create_engine(
-        TEST_DB_URL.set(database="postgres"), isolation_level="AUTOCOMMIT"
-    )
+    admin_engine = create_engine(TEST_DB_URL.set(database="postgres"), isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:
         exists = conn.scalar(
             text("SELECT 1 FROM pg_database WHERE datname = :name"),
@@ -55,6 +54,7 @@ def client(db):
         yield db
 
     app.dependency_overrides[get_db] = override_get_db
+    limiter.reset()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

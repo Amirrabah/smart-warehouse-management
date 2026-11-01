@@ -42,7 +42,7 @@ def create_location(data: LocationCreate, _: AdminUser, db: DbSession):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Location code already exists"
-        )
+        ) from None
     db.refresh(location)
     return location
 

@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User
+from app.rate_limit import limiter
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import UserOut
 from app.security import DUMMY_HASH, create_access_token, verify_password
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Annotated[Session, Depends(get_db)]):
+@limiter.limit("5/minute")
+def login(request: Request, data: LoginRequest, db: Annotated[Session, Depends(get_db)]):
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid email or password",
