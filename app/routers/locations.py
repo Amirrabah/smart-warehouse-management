@@ -1,13 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_roles
-from app.models import Location, User, UserRole
+from app.models import Inventory, Location, User, UserRole
 from app.schemas.location import LocationCreate, LocationOut, LocationUpdate
 
 router = APIRouter(prefix="/locations", tags=["locations"])
@@ -55,6 +55,16 @@ def get_location(location_id: int, _: AnyUser, db: DbSession):
 @router.patch("/{location_id}", response_model=LocationOut)
 def update_location(location_id: int, data: LocationUpdate, _: AdminUser, db: DbSession):
     location = get_location_or_404(db, location_id)
+    if data.is_active is False:
+        stock = db.scalar(
+            select(func.coalesce(func.sum(Inventory.quantity), 0)).where(
+                Inventory.location_id == location_id
+            )
+        )
+        if stock > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Location still holds stock"
+            )
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(location, field, value)
     db.commit()
