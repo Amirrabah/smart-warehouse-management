@@ -70,7 +70,7 @@ Password is never returned in any response.
 | GET | `/locations?active=` | all | | 2 |
 | POST | `/locations` | A | `code` must match `^[A-Z]-\d{2}-\d{2}$`. Duplicate → `409` | 2 |
 | GET | `/locations/{id}` | all | | 2 |
-| PATCH | `/locations/{id}` | A | `is_active`. Deactivating while it holds stock → `409` | 2 |
+| PATCH | `/locations/{id}` | A | `description`, `is_active` (code locked). Deactivating while it holds stock → `409` (added in Phase 3) | 2 |
 
 ### Stock movements
 
