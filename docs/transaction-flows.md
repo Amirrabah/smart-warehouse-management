@@ -3,6 +3,11 @@
 How each stock operation runs inside the database: what gets checked, what gets locked, in what order.
 Related: [data-model.md](data-model.md), [api-endpoints.md](api-endpoints.md).
 
+> **Implementation status (Phase 3):** receive, pick, move and adjust are implemented in
+> `app/services/movements.py` and `app/services/stock.py`, each as one transaction.
+> The row locking (`SELECT ... FOR UPDATE`) described below is added in **Phase 4**, test-first:
+> a concurrency test must fail without the lock before the lock is added.
+
 ## 1. Why this document exists
 
 Two workers can press "Pick" at the same moment. Without a plan, both read `quantity = 1`, both subtract 1, and either the stock goes to −1 or one pick silently vanishes (a **lost update**). Every flow below follows the same pattern to make that impossible.

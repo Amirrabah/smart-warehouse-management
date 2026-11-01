@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phase 0 and 1 merged · Phase 2 complete (products, locations, 86 tests)
+**Status:** Phases 0–2 and quality PR merged · Phase 3 complete (stock movements, 152 tests) · Row locking follows in Phase 4
 
 ## Folder overview
 
@@ -17,7 +17,8 @@ smart-warehouse-management/
 │   └── versions/
 │       ├── 6d7f438baf76_initial_empty_migration.py
 │       ├── 5c21740ef948_create_users_table.py
-│       └── 61dc112b45e4_create_products_and_locations_tables.py
+│       ├── 61dc112b45e4_create_products_and_locations_tables.py
+│       └── a25281f0285d_create_inventory_and_stock_movements_.py
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
@@ -25,32 +26,45 @@ smart-warehouse-management/
 │   ├── database.py
 │   ├── security.py
 │   ├── dependencies.py
+│   ├── rate_limit.py
 │   ├── seed.py
 │   ├── models/
 │   │   ├── __init__.py
+│   │   ├── inventory.py
 │   │   ├── location.py
 │   │   ├── product.py
+│   │   ├── stock_movement.py
 │   │   └── user.py
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── auth.py
 │   │   ├── location.py
+│   │   ├── movement.py
 │   │   ├── product.py
 │   │   └── user.py
-│   └── routers/
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── locations.py
+│   │   ├── movements.py
+│   │   ├── products.py
+│   │   └── users.py
+│   └── services/
 │       ├── __init__.py
-│       ├── auth.py
-│       ├── locations.py
-│       ├── products.py
-│       └── users.py
+│       ├── movements.py
+│       └── stock.py
 ├── docs/
 ├── tests/
 │   ├── conftest.py
 │   ├── test_auth.py
 │   ├── test_health.py
 │   ├── test_locations.py
+│   ├── test_movement_service.py
+│   ├── test_movements_api.py
 │   ├── test_products.py
 │   ├── test_security.py
+│   ├── test_stock_models.py
+│   ├── test_stock_service.py
 │   └── test_users.py
 ├── .env.example
 ├── .gitignore
@@ -58,7 +72,8 @@ smart-warehouse-management/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── README.md
-└── requirements.txt
+├── requirements.txt
+└── ruff.toml
 ```
 
 Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed packages).
@@ -68,11 +83,12 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | File | Contains | Phase |
 |---|---|---|
 | `__init__.py` | Empty. Makes `app` a Python package. | 0 |
-| `main.py` | Creates the FastAPI app, includes the `auth` and `users` routers, `GET /health` | 0, 1 |
+| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health` | 0–3 |
 | `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://` | 0 |
 | `database.py` | `engine` (connection pool, `pool_pre_ping`), `SessionLocal`, `Base` (parent of all models), `get_db()` (one session per request, always closed) | 0 |
 | `security.py` | `hash_password`, `verify_password` (bcrypt), `create_access_token`, `decode_access_token` (JWT, HS256, 60 min), `DUMMY_HASH` (timing protection) | 1 |
 | `dependencies.py` | `get_current_user` (token → user from DB, else **401**), `require_roles(...)` (wrong role → **403**) | 1 |
+| `rate_limit.py` | The shared slowapi `limiter` (login: 5 per minute per IP) | quality |
 | `seed.py` | Creates the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME`. Idempotent. Run with `py -m app.seed`. | 1 |
 
 ### `app/models/` — database tables (SQLAlchemy)
@@ -83,6 +99,8 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | `user.py` | `UserRole` enum (admin / worker / planner) and the `User` table: id, name, email (unique), password_hash, role (CHECK), is_active, created_at |
 | `product.py` | `ProductUnit` enum (pcs / box / kg) and the `Product` table: id, sku (unique), name, unit (CHECK), reorder_point (CHECK ≥ 0), is_active, low_stock_alerted, created_at |
 | `location.py` | `Location` table: id, code (unique, CHECK format `A-01-03`), description (optional), is_active |
+| `inventory.py` | `Inventory` table — current stock: product_id, location_id, quantity, updated_at. UNIQUE (product, location), CHECK quantity >= 0 |
+| `stock_movement.py` | `MovementType` enum (receive / pick / move / adjust) and `StockMovement` table — full history: type, product, from/to location, quantity (CHECK > 0), reason, user, created_at. `DIRECTION_RULE` CHECK enforces the from/to/reason rules per type. Index on (product_id, created_at) |
 
 ### `app/schemas/` — what the API accepts and returns (Pydantic)
 
@@ -93,6 +111,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | `user.py` | `UserOut` (no password), `UserCreate` (email normalised), `UserUpdate` (partial, `extra="forbid"`) |
 | `product.py` | `ProductOut`, `ProductCreate` (SKU normalised to upper case), `ProductUpdate` (name, is_active only — SKU and unit locked), `ReorderPointUpdate` |
 | `location.py` | `LocationOut`, `LocationCreate` (code normalised, must match `A-01-03`), `LocationUpdate` (description, is_active — code locked) |
+| `movement.py` | `ReceiveRequest`, `PickRequest`, `MoveRequest` (from ≠ to), `AdjustRequest` (change ≠ 0, reason required), `MovementOut`, `MovementResponse` (`{movement, inventory}`) |
 
 Rule: **models** describe the database, **schemas** describe the API. `password_hash` exists only in the model.
 
@@ -108,7 +127,18 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | | `POST /products`, `PATCH /products/{id}` | admin |
 | | `PATCH /products/{id}/reorder-point` | admin, planner |
 | `locations.py` | `GET /locations?active=`, `GET /locations/{id}` | any logged-in user |
-| | `POST /locations`, `PATCH /locations/{id}` | admin |
+| | `POST /locations`, `PATCH /locations/{id}` (deactivating a location that holds stock → **409**) | admin |
+| `movements.py` | `POST /movements/receive`, `/pick`, `/move`, `/adjust` — each returns **201** with the movement and new stock per location | admin, worker |
+
+### `app/services/` — business logic (no HTTP)
+
+| File | Contains |
+|---|---|
+| `__init__.py` | Empty |
+| `stock.py` | `increase_stock` (upsert: `INSERT … ON CONFLICT DO UPDATE`), `decrease_stock` (rejects missing / insufficient stock), `StockConflict` (→ 409). Never commits. |
+| `movements.py` | `receive`, `pick`, `move`, `adjust`: check product/location exist and are active (`NotFound` → 404, `StockConflict` → 409), change stock, record the movement, **one commit**. `_all_or_nothing` rolls back on any error. |
+
+Rule: routers handle HTTP (schemas, roles, status codes); services handle the warehouse rules. Services can be tested without HTTP.
 
 ## `alembic/` + `alembic.ini` — migrations
 
@@ -121,6 +151,7 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | `versions/6d7f438baf76_…` | Migration 1: empty, proves the setup |
 | `versions/5c21740ef948_…` | Migration 2: `users` table, unique index on email, CHECK on role |
 | `versions/61dc112b45e4_…` | Migration 3: `products` and `locations` tables, unique SKU and code, CHECKs on unit, reorder point and code format |
+| `versions/a25281f0285d_…` | Migration 4: `inventory` and `stock_movements` tables, all foreign keys, unique (product, location), CHECKs on quantity and movement direction, index on (product_id, created_at) |
 
 Commands:
 
@@ -144,8 +175,14 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_users.py` | worker and planner get 403 on all `/users` endpoints, no token gets 401, admin can list / create / update, duplicates 409, bad input 422, admin cannot demote or deactivate self |
 | `test_products.py` | only admin creates/edits, admin + planner change reorder point, all roles can view, SKU normalised, duplicate SKU 409, bad input 422, SKU/unit locked, search by SKU or name, active filter |
 | `test_locations.py` | only admin creates/edits, all roles can view, code normalised, invalid codes 422, duplicate code 409, code locked, sorted list, active filter |
+| `test_stock_models.py` | database rules: no negative stock, one row per product+location, valid and invalid movement directions, quantity > 0 |
+| `test_stock_service.py` | increase creates/adds, decrease reduces, exact zero keeps the row, insufficient or missing stock rejected and unchanged |
+| `test_movement_service.py` | receive / pick / move / adjust change stock and record a movement with user; failures change nothing; inactive → conflict; unknown → not found; database rejection rolls back |
+| `test_movements_api.py` | planner 403 and no token 401 on all four; admin + worker 201; full flow; 409 / 404 / 422 cases; location with stock cannot be deactivated |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 86 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 152 tests.
+
+Phase 3 was built test-first (red → green): each test was seen failing before the code existed.
 
 ## `docs/` — design documents
 
@@ -154,7 +191,7 @@ Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 86 t
 | `project-brief.md` | Problem, users, MVP, out of scope, phases, success criteria |
 | `data-model.md` | All tables, constraints, movement rules, notifications |
 | `api-endpoints.md` | All planned endpoints with roles and status codes |
-| `transaction-flows.md` | Locking and transaction steps for receive / pick / move / adjust |
+| `transaction-flows.md` | Transaction steps for receive / pick / move / adjust (implemented in Phase 3; row locking in Phase 4) |
 | `project-structure.md` | This file |
 
 ## Root — infrastructure and config
@@ -163,7 +200,8 @@ Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 86 t
 |---|---|
 | `Dockerfile` | Python 3.14-slim → install requirements → copy `alembic/` and `app/` → `alembic upgrade head && uvicorn` on `${PORT:-8000}` |
 | `docker-compose.yml` | `db` (Postgres 17, healthcheck, `pgdata` volume, host port **5433** because a Windows PostgreSQL uses 5432) + `api` (waits for healthy db, `DATABASE_URL` uses host `db`) |
-| `.github/workflows/ci.yml` | On every push and PR: Postgres service → install → migrate → pytest |
+| `.github/workflows/ci.yml` | On every push and PR: Postgres service → install → Ruff lint + format check → migrate → pytest |
+| `ruff.toml` | Ruff rules (E, F, I, B, UP, S), line length 100, `app` first-party, migrations excluded |
 | `requirements.txt` | Pinned packages. Update with `py -m pip freeze \| Set-Content -Encoding ascii requirements.txt` |
 | `.env.example` | Variable names with placeholder values (committed) |
 | `.gitignore` | Keeps `.env`, `.venv`, `__pycache__` out of Git |
