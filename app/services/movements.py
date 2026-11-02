@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models import Location, MovementType, Product, StockMovement, User
-from app.services.stock import StockConflict, decrease_stock, increase_stock
+from app.services.stock import (
+    StockConflict,
+    decrease_stock,
+    increase_stock,
+    lock_stock_rows,
+)
 
 
 class NotFound(Exception):
@@ -130,6 +135,7 @@ def move(
         _check_product(db, product_id)
         _check_location(db, from_location_id)
         _check_location(db, to_location_id)
+        lock_stock_rows(db, product_id, [from_location_id, to_location_id])
         from_quantity = decrease_stock(db, product_id, from_location_id, quantity)
         to_quantity = increase_stock(db, product_id, to_location_id, quantity)
         return _record(

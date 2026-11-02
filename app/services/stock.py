@@ -9,6 +9,20 @@ class StockConflict(Exception):
     """The operation conflicts with the current stock (turned into HTTP 409)."""
 
 
+def lock_stock_rows(db: Session, product_id: int, location_ids: list[int]) -> None:
+    """Lock the inventory rows of several locations, always lowest location id first.
+
+    Locking in one fixed order means two operations can never each hold the lock the
+    other one needs, so they wait for each other instead of deadlocking.
+    """
+    db.execute(
+        select(Inventory.id)
+        .where(Inventory.product_id == product_id, Inventory.location_id.in_(location_ids))
+        .order_by(Inventory.location_id)
+        .with_for_update()
+    )
+
+
 def increase_stock(db: Session, product_id: int, location_id: int, quantity: int) -> int:
     statement = (
         insert(Inventory)
@@ -24,9 +38,9 @@ def increase_stock(db: Session, product_id: int, location_id: int, quantity: int
 
 def decrease_stock(db: Session, product_id: int, location_id: int, quantity: int) -> int:
     row = db.scalar(
-        select(Inventory).where(
-            Inventory.product_id == product_id, Inventory.location_id == location_id
-        )
+        select(Inventory)
+        .where(Inventory.product_id == product_id, Inventory.location_id == location_id)
+        .with_for_update()
     )
     if row is None:
         raise StockConflict("No stock of this product at this location")
