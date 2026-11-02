@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phases 0–2 and quality PR merged · Phase 3 complete (stock movements, 152 tests) · Row locking follows in Phase 4
+**Status:** Phases 0–3 and quality PR merged · Phase 4 complete (row locking, concurrency tests, 154 tests)
 
 ## Folder overview
 
@@ -57,6 +57,7 @@ smart-warehouse-management/
 ├── tests/
 │   ├── conftest.py
 │   ├── test_auth.py
+│   ├── test_concurrency.py
 │   ├── test_health.py
 │   ├── test_locations.py
 │   ├── test_movement_service.py
@@ -95,7 +96,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 
 | File | Contains |
 |---|---|
-| `__init__.py` | Exports `Location`, `Product`, `ProductUnit`, `User`, `UserRole` (Alembic imports this to see all tables) |
+| `__init__.py` | Exports all models and enums (`Inventory`, `Location`, `MovementType`, `Product`, `ProductUnit`, `StockMovement`, `User`, `UserRole`). Alembic imports this to see all tables |
 | `user.py` | `UserRole` enum (admin / worker / planner) and the `User` table: id, name, email (unique), password_hash, role (CHECK), is_active, created_at |
 | `product.py` | `ProductUnit` enum (pcs / box / kg) and the `Product` table: id, sku (unique), name, unit (CHECK), reorder_point (CHECK ≥ 0), is_active, low_stock_alerted, created_at |
 | `location.py` | `Location` table: id, code (unique, CHECK format `A-01-03`), description (optional), is_active |
@@ -135,8 +136,8 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | File | Contains |
 |---|---|
 | `__init__.py` | Empty |
-| `stock.py` | `increase_stock` (upsert: `INSERT … ON CONFLICT DO UPDATE`), `decrease_stock` (rejects missing / insufficient stock), `StockConflict` (→ 409). Never commits. |
-| `movements.py` | `receive`, `pick`, `move`, `adjust`: check product/location exist and are active (`NotFound` → 404, `StockConflict` → 409), change stock, record the movement, **one commit**. `_all_or_nothing` rolls back on any error. |
+| `stock.py` | `increase_stock` (upsert: `INSERT … ON CONFLICT DO UPDATE`), `decrease_stock` (locks the row with `SELECT … FOR UPDATE`, rejects missing / insufficient stock), `lock_stock_rows` (locks several rows, lowest `location_id` first, so moves can't deadlock), `StockConflict` (→ 409). Never commits. |
+| `movements.py` | `receive`, `pick`, `move`, `adjust`: check product/location exist and are active (`NotFound` → 404, `StockConflict` → 409), lock and change stock, record the movement, **one commit**. `_all_or_nothing` rolls back on any error. |
 
 Rule: routers handle HTTP (schemas, roles, status codes); services handle the warehouse rules. Services can be tested without HTTP.
 
@@ -179,10 +180,11 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_stock_service.py` | increase creates/adds, decrease reduces, exact zero keeps the row, insufficient or missing stock rejected and unchanged |
 | `test_movement_service.py` | receive / pick / move / adjust change stock and record a movement with user; failures change nothing; inactive → conflict; unknown → not found; database rejection rolls back |
 | `test_movements_api.py` | planner 403 and no token 401 on all four; admin + worker 201; full flow; 409 / 404 / 422 cases; location with stock cannot be deactivated |
+| `test_concurrency.py` | two threads with separate sessions run at the same moment (a `Barrier` forces the overlap): two picks of the last item → one ok + one conflict, stock 0, one movement; opposite moves A→B and B→A → both ok, no deadlock, correct totals |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 152 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 154 tests.
 
-Phase 3 was built test-first (red → green): each test was seen failing before the code existed.
+Phases 3 and 4 were built test-first (red → green): each test was seen failing before the code existed.
 
 ## `docs/` — design documents
 
@@ -191,7 +193,7 @@ Phase 3 was built test-first (red → green): each test was seen failing before 
 | `project-brief.md` | Problem, users, MVP, out of scope, phases, success criteria |
 | `data-model.md` | All tables, constraints, movement rules, notifications |
 | `api-endpoints.md` | All planned endpoints with roles and status codes |
-| `transaction-flows.md` | Transaction steps for receive / pick / move / adjust (implemented in Phase 3; row locking in Phase 4) |
+| `transaction-flows.md` | Transaction steps for receive / pick / move / adjust (implemented in Phases 3–4) |
 | `project-structure.md` | This file |
 
 ## Root — infrastructure and config
