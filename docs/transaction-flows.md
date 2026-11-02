@@ -3,10 +3,12 @@
 How each stock operation runs inside the database: what gets checked, what gets locked, in what order.
 Related: [data-model.md](data-model.md), [api-endpoints.md](api-endpoints.md).
 
-> **Implementation status (Phase 3):** receive, pick, move and adjust are implemented in
-> `app/services/movements.py` and `app/services/stock.py`, each as one transaction.
-> The row locking (`SELECT ... FOR UPDATE`) described below is added in **Phase 4**, test-first:
-> a concurrency test must fail without the lock before the lock is added.
+> **Implementation status (Phase 4):** all flows below are implemented in
+> `app/services/movements.py` and `app/services/stock.py`, each as one transaction, with row locking:
+> `decrease_stock` uses `SELECT ... FOR UPDATE`, and `move` first calls `lock_stock_rows`
+> (ordered by `location_id`). Proven by `tests/test_concurrency.py`, which fails without the locks.
+> Not implemented yet: the `503` mapping for `DeadlockDetected` in §9. With fixed lock order it
+> should not occur, and if it does it currently returns `500`.
 
 ## 1. Why this document exists
 
