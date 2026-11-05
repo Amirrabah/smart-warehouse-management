@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phases 0–3 and quality PR merged · Phase 4 complete (row locking, concurrency tests, 154 tests)
+**Status:** Phases 0–4 and quality PR merged · Phase 5 complete (stock overview, movement history, pagination, 211 tests)
 
 ## Folder overview
 
@@ -26,6 +26,7 @@ smart-warehouse-management/
 │   ├── database.py
 │   ├── security.py
 │   ├── dependencies.py
+│   ├── pagination.py
 │   ├── rate_limit.py
 │   ├── seed.py
 │   ├── models/
@@ -41,6 +42,7 @@ smart-warehouse-management/
 │   │   ├── location.py
 │   │   ├── movement.py
 │   │   ├── product.py
+│   │   ├── stock.py
 │   │   └── user.py
 │   ├── routers/
 │   │   ├── __init__.py
@@ -48,10 +50,13 @@ smart-warehouse-management/
 │   │   ├── locations.py
 │   │   ├── movements.py
 │   │   ├── products.py
+│   │   ├── stock.py
 │   │   └── users.py
 │   └── services/
 │       ├── __init__.py
+│       ├── history.py
 │       ├── movements.py
+│       ├── overview.py
 │       └── stock.py
 ├── docs/
 ├── tests/
@@ -60,10 +65,13 @@ smart-warehouse-management/
 │   ├── test_concurrency.py
 │   ├── test_health.py
 │   ├── test_locations.py
+│   ├── test_movement_history_api.py
 │   ├── test_movement_service.py
 │   ├── test_movements_api.py
 │   ├── test_products.py
 │   ├── test_security.py
+│   ├── test_stock_api.py
+│   ├── test_stock_detail_api.py
 │   ├── test_stock_models.py
 │   ├── test_stock_service.py
 │   └── test_users.py
@@ -84,11 +92,12 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | File | Contains | Phase |
 |---|---|---|
 | `__init__.py` | Empty. Makes `app` a Python package. | 0 |
-| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health` | 0–3 |
+| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health` | 0–5 |
 | `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://` | 0 |
 | `database.py` | `engine` (connection pool, `pool_pre_ping`), `SessionLocal`, `Base` (parent of all models), `get_db()` (one session per request, always closed) | 0 |
 | `security.py` | `hash_password`, `verify_password` (bcrypt), `create_access_token`, `decode_access_token` (JWT, HS256, 60 min), `DUMMY_HASH` (timing protection) | 1 |
 | `dependencies.py` | `get_current_user` (token → user from DB, else **401**), `require_roles(...)` (wrong role → **403**) | 1 |
+| `pagination.py` | `Paging` dependency (`limit` 1–200, default 50; `offset` ≥ 0 → **422** otherwise) and the generic `Page[T]` response: `{items, total}` | 5 |
 | `rate_limit.py` | The shared slowapi `limiter` (login: 5 per minute per IP) | quality |
 | `seed.py` | Creates the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME`. Idempotent. Run with `py -m app.seed`. | 1 |
 
@@ -112,6 +121,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | `user.py` | `UserOut` (no password), `UserCreate` (email normalised), `UserUpdate` (partial, `extra="forbid"`) |
 | `product.py` | `ProductOut`, `ProductCreate` (SKU normalised to upper case), `ProductUpdate` (name, is_active only — SKU and unit locked), `ReorderPointUpdate` |
 | `location.py` | `LocationOut`, `LocationCreate` (code normalised, must match `A-01-03`), `LocationUpdate` (description, is_active — code locked) |
+| `stock.py` | `StockSummary` (per product: total, reorder point, `below_reorder`), `ProductStock` (summary + `locations`), `LocationQuantity`, `ShelfItem` |
 | `movement.py` | `ReceiveRequest`, `PickRequest`, `MoveRequest` (from ≠ to), `AdjustRequest` (change ≠ 0, reason required), `MovementOut`, `MovementResponse` (`{movement, inventory}`) |
 
 Rule: **models** describe the database, **schemas** describe the API. `password_hash` exists only in the model.
@@ -128,8 +138,11 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | | `POST /products`, `PATCH /products/{id}` | admin |
 | | `PATCH /products/{id}/reorder-point` | admin, planner |
 | `locations.py` | `GET /locations?active=`, `GET /locations/{id}` | any logged-in user |
+| | `GET /locations/{id}/stock` — products on this shelf (quantity > 0) | any logged-in user |
 | | `POST /locations`, `PATCH /locations/{id}` (deactivating a location that holds stock → **409**) | admin |
 | `movements.py` | `POST /movements/receive`, `/pick`, `/move`, `/adjust` — each returns **201** with the movement and new stock per location | admin, worker |
+| | `GET /movements` (filters: product, location, type, user, date range; newest first; paginated), `GET /movements/{id}` | any logged-in user |
+| `stock.py` | `GET /stock?search=&below_reorder=` (paginated), `GET /stock/{product_id}` | any logged-in user |
 
 ### `app/services/` — business logic (no HTTP)
 
@@ -137,6 +150,8 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 |---|---|
 | `__init__.py` | Empty |
 | `stock.py` | `increase_stock` (upsert: `INSERT … ON CONFLICT DO UPDATE`), `decrease_stock` (locks the row with `SELECT … FOR UPDATE`, rejects missing / insufficient stock), `lock_stock_rows` (locks several rows, lowest `location_id` first, so moves can't deadlock), `StockConflict` (→ 409). Never commits. |
+| `overview.py` | `stock_summaries` (LEFT JOIN + SUM + GROUP BY, active products only, `HAVING` for `below_reorder`, count + page), `product_stock`, `location_stock` (quantity > 0 only) |
+| `history.py` | `movement_history` (optional filters, dates are whole UTC days, `ORDER BY created_at DESC, id DESC`), `get_movement` |
 | `movements.py` | `receive`, `pick`, `move`, `adjust`: check product/location exist and are active (`NotFound` → 404, `StockConflict` → 409), lock and change stock, record the movement, **one commit**. `_all_or_nothing` rolls back on any error. |
 
 Rule: routers handle HTTP (schemas, roles, status codes); services handle the warehouse rules. Services can be tested without HTTP.
@@ -180,11 +195,14 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_stock_service.py` | increase creates/adds, decrease reduces, exact zero keeps the row, insufficient or missing stock rejected and unchanged |
 | `test_movement_service.py` | receive / pick / move / adjust change stock and record a movement with user; failures change nothing; inactive → conflict; unknown → not found; database rejection rolls back |
 | `test_movements_api.py` | planner 403 and no token 401 on all four; admin + worker 201; full flow; 409 / 404 / 422 cases; location with stock cannot be deactivated |
+| `test_stock_api.py` | `GET /stock`: login required, all roles, totals over locations, zero stock, `below_reorder`, sorted, inactive hidden, filters, search, pagination + total, invalid paging 422 |
+| `test_stock_detail_api.py` | `GET /stock/{id}` and `GET /locations/{id}/stock`: per-location breakdown sorted by code, zero rows hidden, unknown id 404 |
+| `test_movement_history_api.py` | `GET /movements`: newest first with id tie-break, every filter, whole-day date range, combined filters, pagination, invalid query 422; `GET /movements/{id}` 200 / 401 / 404 |
 | `test_concurrency.py` | two threads with separate sessions run at the same moment (a `Barrier` forces the overlap): two picks of the last item → one ok + one conflict, stock 0, one movement; opposite moves A→B and B→A → both ok, no deadlock, correct totals |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 154 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 211 tests.
 
-Phases 3 and 4 were built test-first (red → green): each test was seen failing before the code existed.
+Phases 3–5 were built test-first (red → green): each test was seen failing before the code existed.
 
 ## `docs/` — design documents
 
