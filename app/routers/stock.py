@@ -7,8 +7,8 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User
 from app.pagination import Page, Paging
-from app.schemas.stock import StockSummary
-from app.services.overview import stock_summaries
+from app.schemas.stock import ProductStock, StockSummary
+from app.services.overview import product_stock, stock_summaries
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -26,3 +26,8 @@ def list_stock(
 ):
     items, total = stock_summaries(db, paging, search=search, below_reorder=below_reorder)
     return Page(items=items, total=total)
+
+
+@router.get("/{product_id}", response_model=ProductStock)
+def get_product_stock(product_id: int, _: AnyUser, db: DbSession):
+    return product_stock(db, product_id)

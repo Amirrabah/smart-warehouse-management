@@ -9,6 +9,8 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models import Inventory, Location, User, UserRole
 from app.schemas.location import LocationCreate, LocationOut, LocationUpdate
+from app.schemas.stock import ShelfItem
+from app.services.overview import location_stock
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
@@ -50,6 +52,11 @@ def create_location(data: LocationCreate, _: AdminUser, db: DbSession):
 @router.get("/{location_id}", response_model=LocationOut)
 def get_location(location_id: int, _: AnyUser, db: DbSession):
     return get_location_or_404(db, location_id)
+
+
+@router.get("/{location_id}/stock", response_model=list[ShelfItem])
+def get_location_stock(location_id: int, _: AnyUser, db: DbSession):
+    return location_stock(db, location_id)
 
 
 @router.patch("/{location_id}", response_model=LocationOut)
