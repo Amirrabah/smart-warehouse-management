@@ -1,6 +1,8 @@
 # API Endpoints — smart-warehouse-management
 
 Design & Planning document. Source of truth for routes, roles and error codes.
+Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flows.md).
+
 > **Implementation status (Phase 5):** all endpoints for Phases 0–5 are implemented and tested.
 > Decisions made while building Phase 5:
 > - `GET /stock` lists **active** products only (inactive products are hidden from the overview).
@@ -9,6 +11,7 @@ Design & Planning document. Source of truth for routes, roles and error codes.
 > - Paginated so far: `GET /stock` and `GET /movements`. `GET /users`, `/products`, `/locations` and
 >   `/locations/{id}/stock` still return plain lists. They are small and bounded, so pagination is
 >   left for later if needed.
+
 ## 1. Design rules
 
 | Rule | Reason |
