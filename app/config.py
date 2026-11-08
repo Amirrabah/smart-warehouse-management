@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     database_url: str
     jwt_secret: str
+    scheduler_enabled: bool = False  # true only in the running app, never in tests
 
     @field_validator("database_url")
     @classmethod

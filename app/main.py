@@ -1,14 +1,42 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.config import settings
 from app.rate_limit import limiter
-from app.routers import auth, locations, movements, planner, products, stock, users
+from app.routers import (
+    auth,
+    locations,
+    movements,
+    notifications,
+    planner,
+    products,
+    stock,
+    users,
+)
+from app.scheduler import create_scheduler
 from app.services.movements import NotFound
 from app.services.stock import StockConflict
 
-app = FastAPI(title="Smart Warehouse Management")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the nightly scheduler with the app, and stop it when the app stops."""
+    scheduler = create_scheduler() if settings.scheduler_enabled else None
+    if scheduler:
+        scheduler.start()
+    yield
+    if scheduler:
+        scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Smart Warehouse Management", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -31,6 +59,7 @@ app.include_router(locations.router)
 app.include_router(movements.router)
 app.include_router(stock.router)
 app.include_router(planner.router)
+app.include_router(notifications.router)
 
 
 @app.get("/health")
