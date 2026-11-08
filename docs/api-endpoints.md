@@ -3,12 +3,12 @@
 Design & Planning document. Source of truth for routes, roles and error codes.
 Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flows.md).
 
-> **Implementation status (Phase 6):** all endpoints for Phases 0–6 are implemented and tested.
+> **Implementation status (Phase 7):** all 27 endpoints are implemented and tested.
 > Decisions made while building Phase 5:
 > - `GET /stock` lists **active** products only (inactive products are hidden from the overview).
 > - `date_from` / `date_to` on `GET /movements` are whole days in UTC, both inclusive.
 > - Movements with the same `created_at` are ordered by `id` (newest first), so pages never overlap.
-> - Paginated so far: `GET /stock`, `GET /movements` and (Phase 6) `GET /planner`. `GET /users`, `/products`, `/locations` and
+> - Paginated so far: `GET /stock`, `GET /movements`, `GET /planner` and `GET /notifications`. `GET /users`, `/products`, `/locations` and
 >   `/locations/{id}/stock` still return plain lists. They are small and bounded, so pagination is
 >   left for later if needed.
 >
@@ -16,6 +16,11 @@ Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flow
 > - Usage = quantity **picked** in the last 30 days. Receive, move and adjust are not usage.
 > - `avg_daily_usage` = usage ÷ 30; `days_left` = total ÷ `avg_daily_usage`, `null` when there is no usage.
 > - `sort` is `days_left` (default, `null` last) or `sku`. The response is paginated like `/stock`.
+>
+> Decisions made while building Phase 7 (notifications):
+> - `GET /notifications` is newest first and paginated like the other lists.
+> - Marking a notification as read twice keeps the **first** `read_at`; the response is the notification.
+> - If there are no active admins or planners, the nightly job flags nothing, so the alert is sent later.
 
 ## 1. Design rules
 
@@ -133,8 +138,8 @@ Adjust translation (API is friendly, DB stays strict):
 
 | Method | Path | Roles | Notes | Phase |
 |---|---|---|---|---|
-| GET | `/notifications?unread=` | A, P | Only the current user's (`user_id = current_user.id`) | 7 |
-| POST | `/notifications/{id}/read` | A, P | Sets `read_at = now()` if NULL. Another user's notification → `404` | 7 |
+| GET | `/notifications?unread=` | A, P | Only the current user's (`user_id = current_user.id`). Newest first, paginated | 7 |
+| POST | `/notifications/{id}/read` | A, P | Sets `read_at = now()` if NULL and returns the notification. Another user's notification → `404` | 7 |
 
 Why `404` and not `403` for someone else's notification: `403` confirms the ID exists. `404` leaks nothing.
 
@@ -143,6 +148,8 @@ Why `404` and not `403` for someone else's notification: `403` confirms the ID e
 ## 4. Not an endpoint
 
 The nightly low-stock job is a plain function, `run_low_stock_check(db)`. A scheduler calls it, and tests call it directly. It is not exposed over HTTP, so nobody can trigger it from outside.
+
+It runs every night at **02:00 UTC** through APScheduler inside the app (`app/scheduler.py`), and only when `SCHEDULER_ENABLED=true` (set in `docker-compose.yml` and on the server, never in tests).
 
 ## 5. Validation and conflict rules
 

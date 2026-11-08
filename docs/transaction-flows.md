@@ -3,12 +3,18 @@
 How each stock operation runs inside the database: what gets checked, what gets locked, in what order.
 Related: [data-model.md](data-model.md), [api-endpoints.md](api-endpoints.md).
 
-> **Implementation status (Phase 4):** all flows below are implemented in
+> **Implementation status (Phase 7):** all flows below are implemented in
 > `app/services/movements.py` and `app/services/stock.py`, each as one transaction, with row locking:
 > `decrease_stock` uses `SELECT ... FOR UPDATE`, and `move` first calls `lock_stock_rows`
 > (ordered by `location_id`). Proven by `tests/test_concurrency.py`, which fails without the locks.
 > Not implemented yet: the `503` mapping for `DeadlockDetected` in §9. With fixed lock order it
 > should not occur, and if it does it currently returns `500`.
+>
+> §8, the nightly job, is `run_low_stock_check` in `app/services/alerts.py`, started every night at
+> 02:00 UTC by `app/scheduler.py`. One difference from the sketch in §8: if there are no active admins
+> or planners, the products are **not** flagged, so the alert is not lost. Proven by
+> `tests/test_low_stock_job.py`. The job assumes one running app instance; with several instances,
+> each would run its own scheduler.
 
 ## 1. Why this document exists
 
