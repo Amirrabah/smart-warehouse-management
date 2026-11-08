@@ -4,7 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.rate_limit import limiter
-from app.routers import auth, locations, movements, products, stock, users
+from app.routers import auth, locations, movements, planner, products, stock, users
 from app.services.movements import NotFound
 from app.services.stock import StockConflict
 
@@ -30,6 +30,7 @@ app.include_router(products.router)
 app.include_router(locations.router)
 app.include_router(movements.router)
 app.include_router(stock.router)
+app.include_router(planner.router)
 
 
 @app.get("/health")
