@@ -3,14 +3,19 @@
 Design & Planning document. Source of truth for routes, roles and error codes.
 Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flows.md).
 
-> **Implementation status (Phase 5):** all endpoints for Phases 0–5 are implemented and tested.
+> **Implementation status (Phase 6):** all endpoints for Phases 0–6 are implemented and tested.
 > Decisions made while building Phase 5:
 > - `GET /stock` lists **active** products only (inactive products are hidden from the overview).
 > - `date_from` / `date_to` on `GET /movements` are whole days in UTC, both inclusive.
 > - Movements with the same `created_at` are ordered by `id` (newest first), so pages never overlap.
-> - Paginated so far: `GET /stock` and `GET /movements`. `GET /users`, `/products`, `/locations` and
+> - Paginated so far: `GET /stock`, `GET /movements` and (Phase 6) `GET /planner`. `GET /users`, `/products`, `/locations` and
 >   `/locations/{id}/stock` still return plain lists. They are small and bounded, so pagination is
 >   left for later if needed.
+>
+> Decisions made while building Phase 6 (`GET /planner`):
+> - Usage = quantity **picked** in the last 30 days. Receive, move and adjust are not usage.
+> - `avg_daily_usage` = usage ÷ 30; `days_left` = total ÷ `avg_daily_usage`, `null` when there is no usage.
+> - `sort` is `days_left` (default, `null` last) or `sku`. The response is paginated like `/stock`.
 
 ## 1. Design rules
 
@@ -122,7 +127,7 @@ Adjust translation (API is friendly, DB stays strict):
 
 | Method | Path | Roles | Notes | Phase |
 |---|---|---|---|---|
-| GET | `/planner?only_below=&sort=days_left` | all | Per product: `total`, `reorder_point`, `avg_daily_usage`, `days_left` (`null` when no usage) | 6 |
+| GET | `/planner?only_below=&sort=days_left` | all | Per product: `total`, `reorder_point`, `used_last_30_days`, `avg_daily_usage`, `days_left` (`null` when no usage). Paginated | 6 |
 
 ### Notifications
 

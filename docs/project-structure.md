@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phases 0–4 and quality PR merged · Phase 5 complete (stock overview, movement history, pagination, 211 tests)
+**Status:** Phases 0–5 and quality PR merged · Phase 6 complete (light planner: usage and days left, 227 tests)
 
 ## Folder overview
 
@@ -41,6 +41,7 @@ smart-warehouse-management/
 │   │   ├── auth.py
 │   │   ├── location.py
 │   │   ├── movement.py
+│   │   ├── planner.py
 │   │   ├── product.py
 │   │   ├── stock.py
 │   │   └── user.py
@@ -49,6 +50,7 @@ smart-warehouse-management/
 │   │   ├── auth.py
 │   │   ├── locations.py
 │   │   ├── movements.py
+│   │   ├── planner.py
 │   │   ├── products.py
 │   │   ├── stock.py
 │   │   └── users.py
@@ -57,6 +59,7 @@ smart-warehouse-management/
 │       ├── history.py
 │       ├── movements.py
 │       ├── overview.py
+│       ├── planner.py
 │       └── stock.py
 ├── docs/
 ├── tests/
@@ -68,6 +71,7 @@ smart-warehouse-management/
 │   ├── test_movement_history_api.py
 │   ├── test_movement_service.py
 │   ├── test_movements_api.py
+│   ├── test_planner_api.py
 │   ├── test_products.py
 │   ├── test_security.py
 │   ├── test_stock_api.py
@@ -92,7 +96,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | File | Contains | Phase |
 |---|---|---|
 | `__init__.py` | Empty. Makes `app` a Python package. | 0 |
-| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health` | 0–5 |
+| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health` | 0–6 |
 | `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://` | 0 |
 | `database.py` | `engine` (connection pool, `pool_pre_ping`), `SessionLocal`, `Base` (parent of all models), `get_db()` (one session per request, always closed) | 0 |
 | `security.py` | `hash_password`, `verify_password` (bcrypt), `create_access_token`, `decode_access_token` (JWT, HS256, 60 min), `DUMMY_HASH` (timing protection) | 1 |
@@ -122,6 +126,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | `product.py` | `ProductOut`, `ProductCreate` (SKU normalised to upper case), `ProductUpdate` (name, is_active only — SKU and unit locked), `ReorderPointUpdate` |
 | `location.py` | `LocationOut`, `LocationCreate` (code normalised, must match `A-01-03`), `LocationUpdate` (description, is_active — code locked) |
 | `stock.py` | `StockSummary` (per product: total, reorder point, `below_reorder`), `ProductStock` (summary + `locations`), `LocationQuantity`, `ShelfItem` |
+| `planner.py` | `PlannerRow`: total, reorder point, `below_reorder`, `used_last_30_days`, `avg_daily_usage`, `days_left` (null when no usage) |
 | `movement.py` | `ReceiveRequest`, `PickRequest`, `MoveRequest` (from ≠ to), `AdjustRequest` (change ≠ 0, reason required), `MovementOut`, `MovementResponse` (`{movement, inventory}`) |
 
 Rule: **models** describe the database, **schemas** describe the API. `password_hash` exists only in the model.
@@ -143,6 +148,7 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | `movements.py` | `POST /movements/receive`, `/pick`, `/move`, `/adjust` — each returns **201** with the movement and new stock per location | admin, worker |
 | | `GET /movements` (filters: product, location, type, user, date range; newest first; paginated), `GET /movements/{id}` | any logged-in user |
 | `stock.py` | `GET /stock?search=&below_reorder=` (paginated), `GET /stock/{product_id}` | any logged-in user |
+| `planner.py` | `GET /planner?only_below=&sort=days_left\|sku` (paginated) | any logged-in user |
 
 ### `app/services/` — business logic (no HTTP)
 
@@ -152,6 +158,7 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 | `stock.py` | `increase_stock` (upsert: `INSERT … ON CONFLICT DO UPDATE`), `decrease_stock` (locks the row with `SELECT … FOR UPDATE`, rejects missing / insufficient stock), `lock_stock_rows` (locks several rows, lowest `location_id` first, so moves can't deadlock), `StockConflict` (→ 409). Never commits. |
 | `overview.py` | `stock_summaries` (LEFT JOIN + SUM + GROUP BY, active products only, `HAVING` for `below_reorder`, count + page), `product_stock`, `location_stock` (quantity > 0 only) |
 | `history.py` | `movement_history` (optional filters, dates are whole UTC days, `ORDER BY created_at DESC, id DESC`), `get_movement` |
+| `planner.py` | `planner_rows`: stock and 30-day pick usage summed in **separate subqueries** (avoids fan-out), `days_left = total × 30 / used` computed in SQL so the database can sort by it (`NULLS LAST`) |
 | `movements.py` | `receive`, `pick`, `move`, `adjust`: check product/location exist and are active (`NotFound` → 404, `StockConflict` → 409), lock and change stock, record the movement, **one commit**. `_all_or_nothing` rolls back on any error. |
 
 Rule: routers handle HTTP (schemas, roles, status codes); services handle the warehouse rules. Services can be tested without HTTP.
@@ -198,11 +205,12 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_stock_api.py` | `GET /stock`: login required, all roles, totals over locations, zero stock, `below_reorder`, sorted, inactive hidden, filters, search, pagination + total, invalid paging 422 |
 | `test_stock_detail_api.py` | `GET /stock/{id}` and `GET /locations/{id}/stock`: per-location breakdown sorted by code, zero rows hidden, unknown id 404 |
 | `test_movement_history_api.py` | `GET /movements`: newest first with id tie-break, every filter, whole-day date range, combined filters, pagination, invalid query 422; `GET /movements/{id}` 200 / 401 / 404 |
+| `test_planner_api.py` | usage = picks in the last 30 days only (old picks and receive / move / adjust ignored), avg and days left, null when unused, inactive hidden, sort by days left (nulls last) or SKU, `only_below`, pagination, invalid query 422 |
 | `test_concurrency.py` | two threads with separate sessions run at the same moment (a `Barrier` forces the overlap): two picks of the last item → one ok + one conflict, stock 0, one movement; opposite moves A→B and B→A → both ok, no deadlock, correct totals |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 211 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 227 tests.
 
-Phases 3–5 were built test-first (red → green): each test was seen failing before the code existed.
+Phases 3–6 were built test-first (red → green): each test was seen failing before the code existed.
 
 ## `docs/` — design documents
 
