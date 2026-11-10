@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phases 0–6 and quality PR merged · Phase 7 complete (notifications, nightly low-stock job, scheduler, 262 tests)
+**Status:** Phases 0–7 merged · Phase 8 complete (frontend in `app/static/`, served at `/app`, 316 tests incl. browser smoke tests)
 
 ## Folder overview
 
@@ -31,6 +31,10 @@ smart-warehouse-management/
 │   ├── rate_limit.py
 │   ├── scheduler.py
 │   ├── seed.py
+│   ├── static/            (the frontend, see below)
+│   │   ├── *.html         (11 pages)
+│   │   ├── css/style.css
+│   │   └── js/            (one module per page + api.js, dom.js, layout.js, lookups.js)
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── inventory.py
@@ -70,9 +74,11 @@ smart-warehouse-management/
 │       └── stock.py
 ├── docs/
 ├── tests/
+│   ├── e2e/test_smoke.py
 │   ├── conftest.py
 │   ├── test_auth.py
 │   ├── test_concurrency.py
+│   ├── test_frontend.py
 │   ├── test_health.py
 │   ├── test_locations.py
 │   ├── test_low_stock_job.py
@@ -97,6 +103,7 @@ smart-warehouse-management/
 ├── Dockerfile
 ├── README.md
 ├── requirements.txt
+├── requirements-dev.txt
 └── ruff.toml
 ```
 
@@ -107,7 +114,7 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 | File | Contains | Phase |
 |---|---|---|
 | `__init__.py` | Empty. Makes `app` a Python package. | 0 |
-| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health`. `lifespan` starts the nightly scheduler when `SCHEDULER_ENABLED` is true and stops it on shutdown; logging set to INFO | 0–7 |
+| `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health`. `lifespan` starts the nightly scheduler when `SCHEDULER_ENABLED` is true and stops it on shutdown; logging set to INFO. Phase 8: security-headers middleware (strict CSP on everything except `/docs` and `/redoc`, plus `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`), `GET /` → redirect to `/app/`, `app/static` mounted at `/app` (last, so it can never shadow an API route), `.js`/`.css` MIME types pinned (Windows registry can say `text/plain`) | 0–8 |
 | `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://`; `scheduler_enabled` (default **false**, so tests never start a background thread) | 0, 7 |
 | `database.py` | `engine` (connection pool, `pool_pre_ping`), `SessionLocal`, `Base` (parent of all models), `get_db()` (one session per request, always closed) | 0 |
 | `security.py` | `hash_password`, `verify_password` (bcrypt), `create_access_token`, `decode_access_token` (JWT, HS256, 60 min), `DUMMY_HASH` (timing protection) | 1 |
@@ -180,6 +187,35 @@ Rule: **models** describe the database, **schemas** describe the API. `password_
 
 Rule: routers handle HTTP (schemas, roles, status codes); services handle the warehouse rules. Services can be tested without HTTP.
 
+### `app/static/` — the frontend (Phase 8)
+
+Plain HTML, CSS and JavaScript modules. No build step, no framework, same origin as the API (no CORS).
+
+| Page | For | What it does |
+|---|---|---|
+| `index.html` | everyone | Login. Stores the JWT in `sessionStorage`, then goes to the role's start page (admin → stock, worker → operations, planner → planner) |
+| `stock.html` | all | Stock overview: search, "only below reorder point", paginated |
+| `product.html?id=` | all | One product: totals, stock per location, last 10 movements; reorder-point form for admin + planner; quick links to operations for admin + worker |
+| `operations.html` | admin, worker | Receive / pick / move / adjust in one form. "From" only lists locations holding the product, with quantities. Clear 409 / 422 messages. Prefills from `?type=&product=&from=` |
+| `history.html` | all | Movement history with every API filter (user filter for admins only, since only admins can list users); filters kept in the URL |
+| `planner.html` | all | Usage, per-day average, days left with a small gauge, below-reorder status |
+| `notifications.html` | admin, planner | Inbox, unread filter, mark as read (updates the menu badge) |
+| `shelf.html?id=` | all | What is on one location; printable count sheet with a blank "Counted" column; link to record a count difference |
+| `products.html`, `locations.html`, `users.html` | admin | Create + edit (in a `<dialog>`), activate / deactivate. Own role/active can't be changed (API returns 409 anyway) |
+
+| Script | Contains |
+|---|---|
+| `js/api.js` | `api()` — adds the token, turns errors into readable text (422 field list, 409 detail, 403/429/5xx messages), **401 → back to login**; `apiAll()` for paginated lists |
+| `js/dom.js` | `el()` builds elements; text only via `textContent`. Helpers for tables, selects, pager, messages, dialogs, number/date formatting |
+| `js/layout.js` | `startPage({roles})`: checks login with `/auth/me`, draws the role-based menu, unread badge (`/notifications?unread=true&limit=1` → `total`), logout; shows "No access" if the role doesn't match |
+| `js/lookups.js` | Loads products / locations / users into id maps; `movementRow()` shared by history, product and operations pages |
+
+Security rules (checked by `tests/test_frontend.py`):
+- CSP `script-src 'self'; style-src 'self'` → no inline `<script>`, no `onclick=`, no `style=` in any page.
+- No `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write` / `eval` in any script: API data can never become HTML.
+- Hiding a menu item is only convenience. The backend's 403 is the real block.
+- Token in `sessionStorage`, not a cookie → no CSRF; it disappears when the tab closes. Logout only forgets the token (it stays valid until it expires, see known gaps).
+
 ## `alembic/` + `alembic.ini` — migrations
 
 | File | Contains |
@@ -228,11 +264,14 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_low_stock_job.py` | one notification per active admin/planner, message lists every low product, flags set, second run no duplicates, restock clears the flag, low again alerts again, inactive products ignored, no recipients → no flags, failure saves nothing |
 | `test_notifications_api.py` | login required, workers 403, only own notifications, newest first, unread/read filter, pagination, mark as read, second read keeps first time, someone else's or unknown id → 404 |
 | `test_scheduler.py` | job runs at 02:00 UTC, opens its own session, errors are logged not raised, scheduler starts and stops with the app when enabled, stays off otherwise, off by default |
+| `test_frontend.py` | `/` redirects to `/app/`, pages and JS/CSS served with the right types, security headers present (no CSP on `/docs`), every page exists, has no inline JS/CSS and only loads scripts that exist, no script builds HTML from strings |
+| `e2e/test_smoke.py` | Real browser (Playwright + Chromium) against the app running in a thread on the test DB: login and wrong password, worker picks stock and sees the 409, worker blocked from admin page, planner changes a reorder point, admin adds a location, logout. Fails on any JS error or CSP violation. Skipped if Playwright is not installed |
 | `test_concurrency.py` | two threads with separate sessions run at the same moment (a `Barrier` forces the overlap): two picks of the last item → one ok + one conflict, stock 0, one movement; opposite moves A→B and B→A → both ok, no deadlock, correct totals |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 262 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 316 tests.
+For the browser tests: `py -m pip install -r requirements-dev.txt` and `py -m playwright install chromium` once.
 
-Phases 3–7 were built test-first (red → green): each test was seen failing before the code existed.
+Phases 3–8 were built test-first (red → green): each test was seen failing before the code existed.
 
 ## `docs/` — design documents
 
@@ -250,9 +289,10 @@ Phases 3–7 were built test-first (red → green): each test was seen failing b
 |---|---|
 | `Dockerfile` | Python 3.14-slim → install requirements → copy `alembic/` and `app/` → `alembic upgrade head && uvicorn` on `${PORT:-8000}` |
 | `docker-compose.yml` | `db` (Postgres 17, healthcheck, `pgdata` volume, host port **5433** because a Windows PostgreSQL uses 5432) + `api` (waits for healthy db, `DATABASE_URL` uses host `db`, `SCHEDULER_ENABLED: "true"`) |
-| `.github/workflows/ci.yml` | On every push and PR: Postgres service → install → Ruff lint + format check → migrate → pytest |
+| `.github/workflows/ci.yml` | On every push and PR: Postgres service → install `requirements-dev.txt` + Chromium → Ruff lint + format check → migrate → pytest (incl. browser tests) |
 | `ruff.toml` | Ruff rules (E, F, I, B, UP, S), line length 100, `app` first-party, migrations excluded |
-| `requirements.txt` | Pinned packages. Update with `py -m pip freeze \| Set-Content -Encoding ascii requirements.txt` |
+| `requirements.txt` | Pinned packages for the app (what the Docker image installs) |
+| `requirements-dev.txt` | `-r requirements.txt` + Playwright for browser tests. Not in the Docker image |
 | `.env.example` | Variable names with placeholder values (committed), including `SCHEDULER_ENABLED=false` |
 | `.gitignore` | Keeps `.env`, `.venv`, `__pycache__` out of Git |
 | `README.md` | Title only — written in Phase 9 |
