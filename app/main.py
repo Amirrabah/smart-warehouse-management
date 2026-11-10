@@ -4,12 +4,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+from app.demo import seed_demo_if_empty
 from app.rate_limit import limiter
 from app.routers import (
     auth,
@@ -55,6 +58,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start the nightly scheduler with the app, and stop it when the app stops."""
+    if settings.demo_mode:
+        seed_demo_if_empty()  # first start of a demo: fill the empty database
     scheduler = create_scheduler() if settings.scheduler_enabled else None
     if scheduler:
         scheduler.start()
@@ -75,9 +80,22 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"  # HTTPS only, 1 year
     if not request.url.path.startswith(DOCS_PATHS):
         response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
     return response
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Same 422 body as FastAPI's default, minus the rejected "input": it can be a password."""
+    hidden = ("input", "ctx")
+    errors = [{k: v for k, v in error.items() if k not in hidden} for error in exc.errors()]
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"detail": jsonable_encoder(errors)},
+    )
 
 
 @app.exception_handler(StockConflict)

@@ -3,7 +3,7 @@
 What every file does and how they connect.
 Update this file at the end of each phase.
 
-**Status:** Phases 0–7 merged · Phase 8 complete (frontend in `app/static/`, served at `/app`, 316 tests incl. browser smoke tests)
+**Status:** Phases 0–8 merged · Phase 9 complete (deploy-ready: proxy-safe rate limit, demo mode, security review, README; 362 tests, 99% coverage)
 
 ## Folder overview
 
@@ -31,6 +31,7 @@ smart-warehouse-management/
 │   ├── rate_limit.py
 │   ├── scheduler.py
 │   ├── seed.py
+│   ├── demo.py
 │   ├── static/            (the frontend, see below)
 │   │   ├── *.html         (11 pages)
 │   │   ├── css/style.css
@@ -102,6 +103,9 @@ smart-warehouse-management/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── README.md
+├── railway.json
+├── .dockerignore
+├── .coveragerc
 ├── requirements.txt
 ├── requirements-dev.txt
 └── ruff.toml
@@ -115,14 +119,15 @@ Not in Git (local only, on purpose): `.env` (real secrets), `.venv/` (installed 
 |---|---|---|
 | `__init__.py` | Empty. Makes `app` a Python package. | 0 |
 | `main.py` | Creates the FastAPI app, includes all routers, rate-limit handler (429), `StockConflict` → **409** and `NotFound` → **404** handlers, `GET /health`. `lifespan` starts the nightly scheduler when `SCHEDULER_ENABLED` is true and stops it on shutdown; logging set to INFO. Phase 8: security-headers middleware (strict CSP on everything except `/docs` and `/redoc`, plus `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`), `GET /` → redirect to `/app/`, `app/static` mounted at `/app` (last, so it can never shadow an API route), `.js`/`.css` MIME types pinned (Windows registry can say `text/plain`) | 0–8 |
-| `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://`; `scheduler_enabled` (default **false**, so tests never start a background thread) | 0, 7 |
+| `config.py` | `Settings`: reads `DATABASE_URL` and `JWT_SECRET` from environment / `.env`; normalises Railway's `postgresql://` to `postgresql+psycopg://`; `scheduler_enabled` (default **false**, so tests never start a background thread); `trust_proxy_headers` and `demo_mode` (both default false); refuses a `JWT_SECRET` under 32 characters or containing `change-me` | 0, 7, 9 |
 | `database.py` | `engine` (connection pool, `pool_pre_ping`), `SessionLocal`, `Base` (parent of all models), `get_db()` (one session per request, always closed) | 0 |
 | `security.py` | `hash_password`, `verify_password` (bcrypt), `create_access_token`, `decode_access_token` (JWT, HS256, 60 min), `DUMMY_HASH` (timing protection) | 1 |
 | `dependencies.py` | `get_current_user` (token → user from DB, else **401**), `require_roles(...)` (wrong role → **403**) | 1 |
 | `pagination.py` | `Paging` dependency (`limit` 1–200, default 50; `offset` ≥ 0 → **422** otherwise) and the generic `Page[T]` response: `{items, total}` | 5 |
-| `rate_limit.py` | The shared slowapi `limiter` (login: 5 per minute per IP) | quality |
-| `scheduler.py` | `create_scheduler()` (APScheduler, job `low_stock_check` every night at **02:00 UTC**, `max_instances=1`, `coalesce`), `nightly_low_stock_job()` (own session, logs the result, logs errors instead of raising) | 7 |
+| `rate_limit.py` | The shared slowapi `limiter` (login: 5 per minute per IP). `client_ip()`: the socket address, or behind a proxy (`TRUST_PROXY_HEADERS=true`) the **last** `X-Forwarded-For` hop, which the proxy adds; earlier hops can be faked | quality, 9 |
+| `scheduler.py` | `create_scheduler()` (APScheduler, job `low_stock_check` every night at **02:00 UTC**, `max_instances=1`, `coalesce`), `nightly_low_stock_job()` (own session, logs the result, logs errors instead of raising). Demo mode adds `demo_reset` at **03:00 UTC** (`nightly_demo_reset_job`) | 7, 9 |
 | `seed.py` | Creates the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME`. Idempotent. Run with `py -m app.seed`. | 1 |
+| `demo.py` | Demo mode. `reset_demo()` wipes every table and loads 12 products, 10 shelves, 3 users (one per role, password `demo-warehouse`) and a month of movements made through the real services, then backdated; ends with the low-stock check. `ensure_demo_data()` only fills an empty database (used on app start). `py -m app.demo` refuses unless `DEMO_MODE=true` | 9 |
 
 ### `app/models/` — database tables (SQLAlchemy)
 
@@ -249,6 +254,11 @@ The container runs `alembic upgrade head` automatically on start.
 | `test_health.py` | `/health` returns 200 `{"status": "ok"}` |
 | `test_security.py` | hash ≠ password, verify works, salting, token round trip, tampered token rejected |
 | `test_auth.py` | login (valid, case-insensitive email, wrong password, unknown email, inactive), `/auth/me`, deactivated user blocked, seed is idempotent |
+| `test_rate_limit.py` | socket address used unless trusting the proxy; behind the proxy the last hop counts, faked earlier hops don't reset the limit, one client can't lock out another |
+| `test_config.py` | weak / placeholder JWT secrets refused, Railway URL normalised, demo mode off by default |
+| `test_password_limits.py` | passwords over 72 **bytes** (e.g. 72 × `é`) → 422 on login, create and change, never 500; the password isn't echoed; a 72-byte non-ASCII password works |
+| `test_demo.py` | demo data: one user per role, history spread over 30 days with all four movement types, stock equals the sum of movements, planner and inbox have content, reset replaces everything and repeats cleanly, only seeds an empty DB; demo accounts endpoint; 03:00 job only in demo mode |
+| `test_cli.py` | `py -m app.seed` (missing / short input, creates once) and `py -m app.demo` (refuses outside demo mode, resets inside) |
 | `test_users.py` | worker and planner get 403 on all `/users` endpoints, no token gets 401, admin can list / create / update, duplicates 409, bad input 422, admin cannot demote or deactivate self |
 | `test_products.py` | only admin creates/edits, admin + planner change reorder point, all roles can view, SKU normalised, duplicate SKU 409, bad input 422, SKU/unit locked, search by SKU or name, active filter |
 | `test_locations.py` | only admin creates/edits, all roles can view, code normalised, invalid codes 422, duplicate code 409, code locked, sorted list, active filter |
@@ -268,7 +278,7 @@ The container runs `alembic upgrade head` automatically on start.
 | `e2e/test_smoke.py` | Real browser (Playwright + Chromium) against the app running in a thread on the test DB: login and wrong password, worker picks stock and sees the 409, worker blocked from admin page, planner changes a reorder point, admin adds a location, logout. Fails on any JS error or CSP violation. Skipped if Playwright is not installed |
 | `test_concurrency.py` | two threads with separate sessions run at the same moment (a `Barrier` forces the overlap): two picks of the last item → one ok + one conflict, stock 0, one movement; opposite moves A→B and B→A → both ok, no deadlock, correct totals |
 
-Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 316 tests.
+Run with `py -m pytest -v` (needs the database: `docker compose up -d db`). 362 tests. Coverage: `py -m pytest --cov` (`.coveragerc`, fails under 95%).
 For the browser tests: `py -m pip install -r requirements-dev.txt` and `py -m playwright install chromium` once.
 
 Phases 3–8 were built test-first (red → green): each test was seen failing before the code existed.
@@ -282,12 +292,18 @@ Phases 3–8 were built test-first (red → green): each test was seen failing b
 | `api-endpoints.md` | All planned endpoints with roles and status codes |
 | `transaction-flows.md` | Transaction steps for receive / pick / move / adjust (implemented in Phases 3–4) and the nightly low-stock job (Phase 7) |
 | `project-structure.md` | This file |
+| `security-review.md` | Pre-deploy security review: what was fixed, what was checked, what to validate after deploy, accepted risks |
+| `deploy.md` | Step-by-step Railway deploy and the environment variables |
+| `screenshots/` | Images used in the README |
 
 ## Root — infrastructure and config
 
 | File | Contains |
 |---|---|
-| `Dockerfile` | Python 3.14-slim → install requirements → copy `alembic/` and `app/` → `alembic upgrade head && uvicorn` on `${PORT:-8000}` |
+| `Dockerfile` | Python 3.14-slim → install requirements → copy `alembic/` and `app/` → run as non-root `appuser` → `alembic upgrade head && uvicorn --proxy-headers` on `${PORT:-8000}` |
+| `.dockerignore` | Keeps `.env`, `.git`, `.venv`, tests and caches out of the build context |
+| `railway.json` | Railway: build from the Dockerfile, health check `/health`, exactly 1 replica, restart on failure |
+| `.coveragerc` | Coverage for `app/` with branches; fails under 95% |
 | `docker-compose.yml` | `db` (Postgres 17, healthcheck, `pgdata` volume, host port **5433** because a Windows PostgreSQL uses 5432) + `api` (waits for healthy db, `DATABASE_URL` uses host `db`, `SCHEDULER_ENABLED: "true"`) |
 | `.github/workflows/ci.yml` | On every push and PR: Postgres service → install `requirements-dev.txt` + Chromium → Ruff lint + format check → migrate → pytest (incl. browser tests) |
 | `ruff.toml` | Ruff rules (E, F, I, B, UP, S), line length 100, `app` first-party, migrations excluded |
@@ -295,7 +311,7 @@ Phases 3–8 were built test-first (red → green): each test was seen failing b
 | `requirements-dev.txt` | `-r requirements.txt` + Playwright for browser tests. Not in the Docker image |
 | `.env.example` | Variable names with placeholder values (committed), including `SCHEDULER_ENABLED=false` |
 | `.gitignore` | Keeps `.env`, `.venv`, `__pycache__` out of Git |
-| `README.md` | Title only — written in Phase 9 |
+| `README.md` | What it does, screenshots (`docs/screenshots/`), architecture, design decisions, how to run and test |
 
 ## How a request flows through the files
 

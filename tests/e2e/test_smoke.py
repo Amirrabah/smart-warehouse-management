@@ -194,3 +194,25 @@ def test_logout_returns_to_login(live_server, page, warehouse):
     expect(page.get_by_text("You are logged out.")).to_be_visible()
     page.goto(f"{live_server}/app/stock.html")
     expect(page.get_by_role("heading", name="Log in")).to_be_visible()
+
+
+def test_demo_login_buttons_log_in_with_one_click(live_server, page, db, monkeypatch):
+    # Set after the server started, so the app's startup doesn't seed the dev database.
+    from app.config import settings
+    from app.demo import reset_demo
+
+    reset_demo(db)
+    monkeypatch.setattr(settings, "demo_mode", True)
+
+    page.goto(f"{live_server}/app/")
+    page.get_by_role("button", name=re.compile("Planner")).click()
+
+    expect(page).to_have_url(re.compile(r"/app/planner\.html$"))
+    expect(page.get_by_role("link", name="BOX-M")).to_be_visible()
+
+
+def test_no_demo_logins_outside_demo_mode(live_server, page):
+    page.goto(f"{live_server}/app/")
+
+    expect(page.get_by_role("heading", name="Log in")).to_be_visible()
+    expect(page.get_by_role("heading", name="Try the demo")).to_be_hidden()

@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -52,4 +55,4 @@ jobs:
         run: alembic upgrade head
 
       - name: Run tests
-        run: python -m pytest -v
+        run: python -m pytest -v --cov --cov-report=term
