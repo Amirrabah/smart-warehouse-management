@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Log in | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/login.js"></script>
+  </head>
+  <body>
+    <div class="login">
+      <section class="login-side">
+        <div>
+          <h1>Smart Warehouse</h1>
+          <p>Every receive, pick, move and count is recorded. Stock never goes below zero, and low stock is flagged every night.</p>
+        </div>
+        <div class="rack" aria-hidden="true">
+          <span class="loc">A-01-01</span>
+          <span class="loc">A-01-02</span>
+          <span class="loc">A-01-03</span>
+          <span class="loc">B-02-01</span>
+        </div>
+      </section>
+
+      <main class="login-main">
+        <form id="login-form" class="login-form" novalidate>
+          <h2>Log in</h2>
+          <p id="login-message" class="msg msg-info" hidden></p>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" required />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </div>
+          <button class="btn" type="submit">Log in</button>
+        </form>
+      </main>
+    </div>
+  </body>
+</html>

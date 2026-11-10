@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Products | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/products.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Products</h1>
+            <p>Products with history are deactivated, never deleted. SKU and unit cannot change after creation.</p>
+          </div>
+        </div>
+
+        <form class="panel" id="create-form" novalidate>
+          <h2>Add a product</h2>
+          <p id="create-message" class="msg" hidden></p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="sku">SKU</label>
+              <input id="sku" name="sku" maxlength="50" autocomplete="off" required />
+              <span class="hint">Letters, digits and dashes, e.g. CABLE-USB-1M</span>
+            </div>
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" name="name" maxlength="200" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="unit">Unit</label>
+              <select id="unit" name="unit"></select>
+            </div>
+            <div class="field">
+              <label for="reorder_point">Reorder point</label>
+              <input id="reorder_point" name="reorder_point" type="number" min="0" step="1" value="0" />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit">Add product</button>
+          </div>
+        </form>
+
+        <form class="toolbar" id="filters" role="search">
+          <div class="field field-search">
+            <label for="search">Search by SKU or name</label>
+            <input id="search" name="search" type="search" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="active">Show</label>
+            <select id="active" name="active">
+              <option value="">All products</option>
+              <option value="true">Active only</option>
+              <option value="false">Inactive only</option>
+            </select>
+          </div>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Unit</th>
+                <th class="num">Reorder point</th>
+                <th>Status</th>
+                <th><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <dialog id="edit-dialog" aria-labelledby="edit-title">
+          <form id="edit-form" novalidate>
+            <h2 id="edit-title">Edit product</h2>
+            <p id="edit-message" class="msg" hidden></p>
+            <div class="form-grid">
+              <div class="field field-wide">
+                <label for="edit-name">Name</label>
+                <input id="edit-name" name="name" maxlength="200" required />
+              </div>
+              <div class="field">
+                <label for="edit-reorder">Reorder point</label>
+                <input id="edit-reorder" name="reorder_point" type="number" min="0" step="1" />
+              </div>
+              <label class="check field"><input name="is_active" type="checkbox" /> Active</label>
+            </div>
+            <div class="actions">
+              <button class="btn btn-quiet" type="button" data-close>Cancel</button>
+              <button class="btn" type="submit">Save changes</button>
+            </div>
+          </form>
+        </dialog>
+      </main>
+    </div>
+  </body>
+</html>

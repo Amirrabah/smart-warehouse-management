@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/product.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <p><a href="stock.html">Back to stock overview</a></p>
+        <div class="page-head">
+          <div>
+            <h1 id="title">Product</h1>
+            <p id="subtitle"></p>
+          </div>
+          <div class="actions" id="actions"></div>
+        </div>
+
+        <p id="message" class="msg" hidden></p>
+
+        <dl class="facts" id="facts"></dl>
+
+        <div class="two-col">
+          <section>
+            <h2>Where it is</h2>
+            <p class="muted">Locations holding this product.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Location</th>
+                    <th class="num">Quantity</th>
+                    <th><span class="visually-hidden">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody id="locations"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <form class="panel" id="reorder-form" hidden>
+              <h3>Reorder point</h3>
+              <p class="muted">The product is flagged when total stock drops below this number.</p>
+              <p id="reorder-message" class="msg" hidden></p>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="reorder_point">Reorder point</label>
+                  <input id="reorder_point" name="reorder_point" type="number" min="0" step="1" required />
+                </div>
+                <div class="field">
+                  <button class="btn" type="submit">Save reorder point</button>
+                </div>
+              </div>
+            </form>
+          </section>
+        </div>
+
+        <section>
+          <div class="page-head">
+            <h2>Recent movements</h2>
+            <a id="history-link" href="history.html">See full history</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th class="num">Quantity</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="movements"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

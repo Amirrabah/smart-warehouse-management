@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock overview | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/stock.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Stock overview</h1>
+            <p>Total stock per active product across all locations.</p>
+          </div>
+        </div>
+
+        <form class="toolbar" id="filters" role="search">
+          <div class="field field-search">
+            <label for="search">Search by SKU or name</label>
+            <input id="search" name="search" type="search" autocomplete="off" />
+          </div>
+          <label class="check"><input id="below" name="below" type="checkbox" /> Only below reorder point</label>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th class="num">In stock</th>
+                <th class="num">Reorder point</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+      </main>
+    </div>
+  </body>
+</html>

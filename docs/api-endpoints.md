@@ -3,7 +3,11 @@
 Design & Planning document. Source of truth for routes, roles and error codes.
 Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flows.md).
 
-> **Implementation status (Phase 7):** all 27 endpoints are implemented and tested.
+> **Implementation status (Phase 8):** all 27 endpoints are implemented and tested.
+> Phase 8 adds no API endpoints. Non-API routes: `GET /` redirects to `/app/`, and the frontend
+> (`app/static`) is served under `/app`. Every response carries security headers; a strict CSP
+> (no inline scripts or styles) applies everywhere except `/docs` and `/redoc`.
+>
 > Decisions made while building Phase 5:
 > - `GET /stock` lists **active** products only (inactive products are hidden from the overview).
 > - `date_from` / `date_to` on `GET /movements` are whole days in UTC, both inclusive.

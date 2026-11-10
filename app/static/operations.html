@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock operations | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/operations.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Stock operations</h1>
+            <p id="intro">Every operation is saved as a movement with your name and the time.</p>
+          </div>
+        </div>
+
+        <form id="op-form" novalidate>
+          <fieldset class="segments">
+            <legend>Operation</legend>
+            <input type="radio" name="type" id="type-receive" value="receive" checked />
+            <label for="type-receive">Receive</label>
+            <input type="radio" name="type" id="type-pick" value="pick" />
+            <label for="type-pick">Pick</label>
+            <input type="radio" name="type" id="type-move" value="move" />
+            <label for="type-move">Move</label>
+            <input type="radio" name="type" id="type-adjust" value="adjust" />
+            <label for="type-adjust">Adjust</label>
+          </fieldset>
+
+          <div class="panel">
+            <p id="type-help" class="muted"></p>
+            <p id="message" class="msg" hidden></p>
+
+            <div class="form-grid">
+              <div class="field field-wide">
+                <label for="product">Product</label>
+                <select id="product" name="product" required></select>
+              </div>
+
+              <div class="field" data-for="pick move">
+                <label for="from">From location</label>
+                <select id="from" name="from"></select>
+                <span class="hint">Only locations holding this product are listed.</span>
+              </div>
+
+              <div class="field" data-for="adjust">
+                <label for="at">Location</label>
+                <select id="at" name="at"></select>
+                <span class="hint">Current quantity is shown next to each location.</span>
+              </div>
+
+              <div class="field" data-for="receive move">
+                <label for="to">To location</label>
+                <select id="to" name="to"></select>
+              </div>
+
+              <div class="field" data-for="adjust">
+                <label for="direction">Change</label>
+                <select id="direction" name="direction">
+                  <option value="-1">Remove stock (counted less)</option>
+                  <option value="1">Add stock (counted more)</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="quantity">Quantity</label>
+                <input id="quantity" name="quantity" type="number" min="1" step="1" inputmode="numeric" required />
+                <span class="hint" id="unit-hint"></span>
+              </div>
+
+              <div class="field field-wide">
+                <label for="reason" id="reason-label">Reason (optional)</label>
+                <input id="reason" name="reason" type="text" maxlength="255" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn" type="submit" id="submit">Receive stock</button>
+            </div>
+          </div>
+        </form>
+
+        <section>
+          <div class="page-head">
+            <h2>Your last movements</h2>
+            <a href="history.html">See all history</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Product</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th class="num">Quantity</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="recent"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
