@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shelves | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/shelf.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head no-print">
+          <div>
+            <h1>Shelves</h1>
+            <p>What is on one location. Print it as a count sheet for a stock count.</p>
+          </div>
+        </div>
+
+        <form class="toolbar no-print" id="picker">
+          <div class="field">
+            <label for="location">Location</label>
+            <select id="location" name="location"></select>
+          </div>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <section id="sheet" hidden>
+          <div class="page-head">
+            <div>
+              <span id="code" class="loc loc-big"></span>
+              <p id="description"></p>
+            </div>
+            <div class="actions no-print">
+              <button class="btn btn-quiet" type="button" id="print">Print count sheet</button>
+            </div>
+          </div>
+          <p class="print-only">Counted by: ____________________ Date: ______________</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Name</th>
+                  <th class="num">System quantity</th>
+                  <th class="count-col print-only">Counted</th>
+                  <th class="no-print"><span class="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locations | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/locations.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Locations</h1>
+            <p>Codes are aisle, rack and shelf: A-01-03 is aisle A, rack 01, shelf 03. A location must be empty before it can be deactivated.</p>
+          </div>
+        </div>
+
+        <form class="panel" id="create-form" novalidate>
+          <h2>Add a location</h2>
+          <p id="create-message" class="msg" hidden></p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="code">Code</label>
+              <input id="code" name="code" maxlength="7" autocomplete="off" placeholder="A-01-03" required />
+              <span class="hint">Format: letter-two digits-two digits</span>
+            </div>
+            <div class="field">
+              <label for="description">Description (optional)</label>
+              <input id="description" name="description" maxlength="200" autocomplete="off" />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit">Add location</button>
+          </div>
+        </form>
+
+        <form class="toolbar" id="filters">
+          <div class="field">
+            <label for="active">Show</label>
+            <select id="active" name="active">
+              <option value="">All locations</option>
+              <option value="true">Active only</option>
+              <option value="false">Inactive only</option>
+            </select>
+          </div>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <dialog id="edit-dialog" aria-labelledby="edit-title">
+          <form id="edit-form" novalidate>
+            <h2 id="edit-title">Edit location</h2>
+            <p id="edit-message" class="msg" hidden></p>
+            <div class="form-grid">
+              <div class="field field-wide">
+                <label for="edit-description">Description</label>
+                <input id="edit-description" name="description" maxlength="200" />
+              </div>
+              <label class="check field"><input name="is_active" type="checkbox" /> Active</label>
+            </div>
+            <div class="actions">
+              <button class="btn btn-quiet" type="button" data-close>Cancel</button>
+              <button class="btn" type="submit">Save changes</button>
+            </div>
+          </form>
+        </dialog>
+      </main>
+    </div>
+  </body>
+</html>
