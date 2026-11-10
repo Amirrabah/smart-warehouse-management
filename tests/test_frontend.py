@@ -138,3 +138,11 @@ def test_script_never_builds_html_from_strings(script: Path):
     code = script.read_text(encoding="utf-8")
 
     assert not UNSAFE_JS.search(code), "use textContent / createElement instead"
+
+
+def test_hsts_only_over_https():
+    # Behind Railway, uvicorn --proxy-headers turns X-Forwarded-Proto: https into an https scheme.
+    https = TestClient(app, base_url="https://testserver")
+
+    assert "max-age=" in https.get("/health").headers["strict-transport-security"]
+    assert "strict-transport-security" not in client.get("/health").headers  # local http
