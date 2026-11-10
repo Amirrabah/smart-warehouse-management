@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notifications | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/notifications.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Notifications</h1>
+            <p>The nightly stock check posts here when products drop below their reorder point.</p>
+          </div>
+        </div>
+
+        <form class="toolbar" id="filters">
+          <label class="check"><input id="unread" name="unread" type="checkbox" /> Only unread</label>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+        <ul class="inbox" id="inbox"></ul>
+        <div class="pager" id="pager"></div>
+      </main>
+    </div>
+  </body>
+</html>
