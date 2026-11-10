@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Movement history | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/history.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Movement history</h1>
+            <p>Every stock change, newest first. Movements are never edited or deleted.</p>
+          </div>
+        </div>
+
+        <form class="toolbar" id="filters">
+          <div class="field">
+            <label for="product_id">Product</label>
+            <select id="product_id" name="product_id"></select>
+          </div>
+          <div class="field">
+            <label for="location_id">Location</label>
+            <select id="location_id" name="location_id"></select>
+          </div>
+          <div class="field">
+            <label for="type">Type</label>
+            <select id="type" name="type"></select>
+          </div>
+          <div class="field" id="user-field" hidden>
+            <label for="user_id">User</label>
+            <select id="user_id" name="user_id"></select>
+          </div>
+          <div class="field">
+            <label for="date_from">From date</label>
+            <input id="date_from" name="date_from" type="date" />
+          </div>
+          <div class="field">
+            <label for="date_to">To date</label>
+            <input id="date_to" name="date_to" type="date" />
+          </div>
+          <button class="btn btn-quiet" type="reset">Clear filters</button>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Product</th>
+                <th>From</th>
+                <th>To</th>
+                <th class="num">Quantity</th>
+                <th>User</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+      </main>
+    </div>
+  </body>
+</html>

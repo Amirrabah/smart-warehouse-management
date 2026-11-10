@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planner | Smart Warehouse</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/planner.js"></script>
+  </head>
+  <body>
+    <div class="shell" id="shell">
+      <main class="content" id="main" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Planner</h1>
+            <p>How long stock will last, based on picks in the last 30 days.</p>
+          </div>
+        </div>
+
+        <form class="toolbar" id="filters">
+          <div class="field">
+            <label for="sort">Sort by</label>
+            <select id="sort" name="sort">
+              <option value="days_left">Days left (fewest first)</option>
+              <option value="sku">SKU</option>
+            </select>
+          </div>
+          <label class="check"><input id="only_below" name="only_below" type="checkbox" /> Only below reorder point</label>
+        </form>
+
+        <p id="message" class="msg" hidden></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th class="num">In stock</th>
+                <th class="num">Reorder point</th>
+                <th class="num">Picked, 30 days</th>
+                <th class="num">Per day</th>
+                <th class="num">Days left</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+        <p class="hint">Days left = stock in hand ÷ average picked per day. A dash means nothing was picked in the last 30 days.</p>
+      </main>
+    </div>
+  </body>
+</html>
