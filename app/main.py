@@ -10,6 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+from app.demo import seed_demo_if_empty
 from app.rate_limit import limiter
 from app.routers import (
     auth,
@@ -55,6 +56,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start the nightly scheduler with the app, and stop it when the app stops."""
+    if settings.demo_mode:
+        seed_demo_if_empty()  # first start of a demo: fill the empty database
     scheduler = create_scheduler() if settings.scheduler_enabled else None
     if scheduler:
         scheduler.start()

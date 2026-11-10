@@ -6,6 +6,13 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=72)
 
 
+class DemoAccount(BaseModel):
+    role: str
+    name: str
+    email: str
+    password: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"  # noqa: S105  (not a password)
