@@ -25,7 +25,7 @@ def create_admin(db, name: str, email: str, password: str) -> bool:
 
 
 def main() -> None:
-    email = os.environ.get("ADMIN_EMAIL")
+    email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     password = os.environ.get("ADMIN_PASSWORD")
     name = os.environ.get("ADMIN_NAME", "Admin")
 
