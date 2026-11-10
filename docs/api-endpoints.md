@@ -3,7 +3,9 @@
 Design & Planning document. Source of truth for routes, roles and error codes.
 Related: [data-model.md](data-model.md), [transaction-flows.md](transaction-flows.md).
 
-> **Implementation status (Phase 8):** all 27 endpoints are implemented and tested.
+> **Implementation status (Phase 9):** all 28 endpoints are implemented and tested.
+> Phase 9 added `GET /auth/demo-accounts` (demo mode) and safer 422 bodies (no `input` echo).
+>
 > Phase 8 adds no API endpoints. Non-API routes: `GET /` redirects to `/app/`, and the frontend
 > (`app/static`) is served under `/app`. Every response carries security headers; a strict CSP
 > (no inline scripts or styles) applies everywhere except `/docs` and `/redoc`.
@@ -65,6 +67,7 @@ Roles: **A** = admin, **W** = worker, **P** = planner. "all" = any logged-in use
 | GET | `/health` | public | Docker / Railway health check | 0 |
 | POST | `/auth/login` | public | Body: `email`, `password`. Returns JWT. Rate-limited 5/min per IP. Inactive user → `401` | 1 |
 | GET | `/auth/me` | all | `id`, `name`, `email`, `role` | 1 |
+| GET | `/auth/demo-accounts` | public | Demo mode only: the three public demo logins (`role`, `name`, `email`, `password`). `[]` when demo mode is off (200, so the login page can ask without a console error) | 9 |
 
 ### Users
 
