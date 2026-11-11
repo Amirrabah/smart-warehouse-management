@@ -4,7 +4,7 @@ A warehouse stock system for a small warehouse: every receive, pick, move and co
 stock can never go below zero (even when two people pick the last item at the same moment), and
 products that are running low are flagged every night.
 
-**Live demo:** _link added after deploy_ (log in with one click as admin, worker or planner; the demo resets every night)
+**Live demo:** https://smart-warehouse-management-production.up.railway.app (log in with one click as admin, worker or planner; the demo resets every night)
 
 ![Planner: days of stock left per product](docs/screenshots/planner.png)
 
